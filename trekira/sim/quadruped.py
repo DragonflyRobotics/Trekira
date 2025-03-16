@@ -6,7 +6,8 @@ import time
 import numpy as np
 
 class Unitree(Simulation):
-    def __init__(self):
+    def __init__(self, name):
+        self.name = name
         self.TIMESTEP = 1./500.
         self.model = None
         self.jointIds = []
@@ -23,6 +24,7 @@ class Unitree(Simulation):
         self.initialBase = None
 
         self.resetButtonId = None
+        self.force = 50
 
         super().__init__()
     
@@ -46,7 +48,7 @@ class Unitree(Simulation):
         for _ in range(10):
             for j in range(self.getJointCount()):
                 targetPos = float(self.reset_pos[j % 3])
-                p.setJointMotorControl2(self.model, self.jointIds[j], p.POSITION_CONTROL, self.jointDirections[j]*targetPos + self.jointOffsets[j], force=p.readUserDebugParameter(self.maxForceId))
+                p.setJointMotorControl2(self.model, self.jointIds[j], p.POSITION_CONTROL, self.jointDirections[j]*targetPos + self.jointOffsets[j], force=self.force)
                 p.stepSimulation()
                 time.sleep(self.TIMESTEP)
 
@@ -77,7 +79,7 @@ class Unitree(Simulation):
             self.jointOffsets.append(-0.7)
             self.jointOffsets.append(0.7)
 
-        self.maxForceId = p.addUserDebugParameter("maxForce", 0, 100, 20)
+        self.maxForceId = p.addUserDebugParameter("maxForce", 0, 100, 70)
         self.resetButtonId = p.addUserDebugParameter("reset", 0, 1, 0)
 
         for j in range(p.getNumJoints(self.model)):
@@ -106,7 +108,7 @@ class Unitree(Simulation):
         states = args[0]
         for j in range(self.getJointCount()):
             targetPos = float(states[j])
-            p.setJointMotorControl2(self.model, self.jointIds[j], p.POSITION_CONTROL, self.jointDirections[j]*targetPos + self.jointOffsets[j], force=p.readUserDebugParameter(self.maxForceId))
+            p.setJointMotorControl2(self.model, self.jointIds[j], p.POSITION_CONTROL, self.jointDirections[j]*targetPos + self.jointOffsets[j], force=self.force)
         p.stepSimulation()
         time.sleep(self.TIMESTEP)
         self.previousState = self.currentState
@@ -123,7 +125,7 @@ class Unitree(Simulation):
             for pose in poses:
                 for j in range(self.getJointCount()):
                     targetPos = float(pose[j % 3])
-                    p.setJointMotorControl2(self.model, self.jointIds[j], p.POSITION_CONTROL, self.jointDirections[j]*targetPos + self.jointOffsets[j], force=p.readUserDebugParameter(self.maxForceId))
+                    p.setJointMotorControl2(self.model, self.jointIds[j], p.POSITION_CONTROL, self.jointDirections[j]*targetPos + self.jointOffsets[j], force=self.force)
                 p.stepSimulation()
                 time.sleep(self.TIMESTEP)
     
@@ -133,12 +135,10 @@ class Unitree(Simulation):
         euler = p.getEulerFromQuaternion(orn)
         
         # Define fall criteria based on orientation and height
-        max_tilt_angle = np.radians(45)  # Max tilt angle in radians (45 degrees)
-        min_height = 0.1  # Minimum height from the ground
-        max_height = 0.6  # Maximum height from the ground
+        max_tilt_angle = np.radians(70)  # Max tilt angle in radians (45 degrees)
         
         # Check if the robot is fallen based on tilt and height
-        if abs(euler[0]) > max_tilt_angle or abs(euler[1]) > max_tilt_angle or pos[2] < min_height or pos[2] > max_height:
+        if abs(euler[0]) > max_tilt_angle: 
             return True
         return False
 
@@ -151,4 +151,4 @@ class Unitree(Simulation):
                 feet_on_ground.append(True)
             else:
                 feet_on_ground.append(False)
-        return not any(feet_on_ground)
+        return not any(feet_on_ground) or self.is_fallen()
